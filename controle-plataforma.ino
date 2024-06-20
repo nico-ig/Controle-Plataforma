@@ -1,7 +1,7 @@
- // ========================= DEFINES
+// ========================= DEFINES
 #define Tms 25
-#define MAX_ECHO_TRAVEL_TIME 20000
 
+#define MAX_ECHO_TRAVEL_TIME 20000
 #define NM 15
 
 #define PWM_LOW 70
@@ -19,10 +19,9 @@ float erro = 0;
 float erro_a = 0;
 float i_erro = -17;
 float d_erro = 0;
-
-float kp = 15.1652;
-float ki = 224.8919;
-float kd = 0.09;
+float kp = 2;
+float ki = 200;
+float kd = 0;
 
 // ========================= GLOBALS
 float _dp = 20;
@@ -49,6 +48,7 @@ float getSensorReading() {
   unsigned int duration = getEchoTravelTime();
   float distance = calcDistance(duration);
   return duration >= MAX_ECHO_TRAVEL_TIME ? -1.0 : distance;
+
 }
 
 // ========================== ANGLE
@@ -66,12 +66,6 @@ float filter(float angle) {
   _previous_angle = filtered;
   return filtered;
 }
-
-// ========================== CONTROL
-//void PWM() {
-//  long input = Serial.parseInt();
-//  _pwm = constrain(input, PWM_LOW, PWM_HIGH);
-//}
 
 // ================================== MAIN
 void initPWM() {
@@ -95,18 +89,18 @@ void setup() {
   initSensor();
   initPWM();
   initSerial();
-  ki = ki*(Tms*10e-6);///////////////////////calcula ki discretizado
-  kd = kd/(Tms*10e-6);///////////////////////calcula kd discretizado
+  ki = ki*(Tms*10e-6);//calcula ki discretizado
+  kd = kd/(Tms*10e-6);//calcula kd discretizado
 }
 
 void loop() {
   unsigned long t0 = millis();
-
+  
   if (Serial.available() > 0) {
     ref = Serial.parseFloat();
   }
-  
-  float distance = getSensorReading(); 
+
+  float distance = getSensorReading();
   float angle = getAngle(distance);
   
   if (isnan(angle)) {
@@ -116,26 +110,19 @@ void loop() {
   }
 
   erro = ref - filtered_angle;
+  i_erro += erro;//////////calcula a integral do erro
+  d_erro = erro - erro_a;//calcula a derivada do erro
+  erro_a = erro;///////////atualiza o erro
   
-  i_erro += erro;///////////////////////////calcula a integral do erro
-  d_erro = erro - erro_a;///////////////////calcula a derivada do erro
-
-  erro_a = erro;////////////////////////////atualiza o erro
-
-  //teste
-  if (abs(erro)<=10){
-   _pwm = (1.1*kp*erro)+(kd*d_erro)+1.8*ki*i_erro;
-  }
-  else{
-  _pwm = (0.4*kp*erro)+(ki*i_erro)-(kd*d_erro);
-  }
-  //_pwm = map(_pwm, 0, PWM_LOW, PWM_HIGH);
+  _pwm = (kp*erro)+(ki*i_erro)-(kd*d_erro);
+  
   _pwm = constrain(_pwm, PWM_LOW, PWM_HIGH);
   analogWrite(PWM_PIN, _pwm);
+  
   Serial.print(_pwm);
-  Serial.print(" "); 
+  Serial.print(" ");
   Serial.print(ref);
-  Serial.print(" "); 
+  Serial.print(" ");
   Serial.println(filtered_angle);
 
   while ((t0 + Tms) > millis()) {}
